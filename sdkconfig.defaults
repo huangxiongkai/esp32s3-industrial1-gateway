@@ -1,0 +1,10 @@
+# This file was generated using idf.py save-defconfig. It can be edited manually.
+# Espressif IoT Development Framework (ESP-IDF)  Project Minimal Configuration
+#
+CONFIG_IDF_TARGET="esp32s3"
+CONFIG_EXAMPLE_WIFI_SSID="16888"
+CONFIG_EXAMPLE_WIFI_PASSWORD="aaa13450595661"
+CONFIG_MQTT_PASSWORD="version=2018-10-31&res=products%2FFF1vl83pTz%2Fdevices%2FESP32_02&et=1910867513&method=md5&sign=Yp%2B1EJIuEHymSH4Vr6XUAQ%3D%3D"
+
+# Hardware: 正点原子 DNESP32-S3, Flash 16MB
+CONFIG_ESPTOOLPY_FLASHSIZE_16MB=y
