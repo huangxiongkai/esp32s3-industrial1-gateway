@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ESP32-S3 工业网关 · M1-M8 系统总流程图（精简版）</title>
+<style>
+  :root{
+    --ink:#1f2937;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0; padding:32px 16px;
+    background:#f3f4f6;
+    font-family:"Microsoft YaHei","PingFang SC","Segoe UI",sans-serif;
+    color:var(--ink);
+    display:flex; flex-direction:column; align-items:center;
+  }
+  .sheet{
+    background:#ffffff; border-radius:16px;
+    box-shadow:0 10px 40px rgba(0,0,0,.12);
+    padding:28px 20px 40px;
+    max-width:1240px; width:100%;
+  }
+  h1{font-size:24px; text-align:center; margin:0 0 4px; letter-spacing:1px;}
+  .sub{text-align:center; color:#6b7280; font-size:13px; margin:0 0 8px;}
+  svg{width:100%; height:auto; display:block;}
+  text{font-family:"Microsoft YaHei","PingFang SC",sans-serif;}
+</style>
+</head>
+<body>
+<div class="sheet">
+  <h1>ESP32-S3 工业网关 · M1–M8 系统总流程图</h1>
+  <p class="sub">上电 → 状态机主流程（M4/M5/M6）→ RUNNING 期 M7 采集闭环 + M8 store-and-forward 断网续传 &nbsp;|&nbsp; 颜色代表架构分层</p>
+
+  <svg viewBox="0 0 1200 1700" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="系统总流程图">
+    <defs>
+      <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+        <path d="M0,0 L10,5 L0,10 z" fill="#374151"/>
+      </marker>
+      <marker id="arrowDash" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+        <path d="M0,0 L10,5 L0,10 z" fill="#dc2626"/>
+      </marker>
+      <marker id="arrowLoop" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+        <path d="M0,0 L10,5 L0,10 z" fill="#d97706"/>
+      </marker>
+      <marker id="arrowBack" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+        <path d="M0,0 L10,5 L0,10 z" fill="#db2777"/>
+      </marker>
+    </defs>
+
+    <!-- ============ 图例 ============ -->
+    <g font-size="13">
+      <rect x="20" y="18" width="1160" height="44" rx="8" fill="#f9fafb" stroke="#e5e7eb"/>
+      <g>
+        <rect x="40" y="32" width="16" height="16" rx="3" fill="#334155"/><text x="62" y="45">状态机/控制</text>
+        <rect x="165" y="32" width="16" height="16" rx="3" fill="#10b981"/><text x="187" y="45">驱动层</text>
+        <rect x="270" y="32" width="16" height="16" rx="3" fill="#3b82f6"/><text x="292" y="45">协议层</text>
+        <rect x="375" y="32" width="16" height="16" rx="3" fill="#f97316"/><text x="397" y="45">管理层</text>
+        <rect x="480" y="32" width="16" height="16" rx="3" fill="#8b5cf6"/><text x="502" y="45">调度层</text>
+        <rect x="585" y="32" width="16" height="16" rx="3" fill="#14b8a6"/><text x="607" y="45">业务层</text>
+        <rect x="690" y="32" width="16" height="16" rx="3" fill="#db2777"/><text x="712" y="45">存储层(M8)</text>
+        <rect x="810" y="32" width="16" height="16" rx="3" fill="#64748b"/><text x="832" y="45">云端/外部</text>
+        <line x1="930" y1="40" x2="970" y2="40" stroke="#dc2626" stroke-width="2" stroke-dasharray="6 4"/><text x="978" y="45">断连回退</text>
+        <line x1="1070" y1="40" x2="1110" y2="40" stroke="#d97706" stroke-width="2"/><text x="1118" y="45">超时重试</text>
+      </g>
+    </g>
+
+    <!-- ============ PART 1 标题 ============ -->
+    <text x="20" y="100" font-size="16" font-weight="bold" fill="#111827">① 启动与状态机主流程</text>
+
+    <!-- 上电 -->
+    <rect x="520" y="120" width="160" height="44" rx="22" fill="#6b7280"/>
+    <text x="600" y="148" text-anchor="middle" fill="#fff" font-size="16" font-weight="bold">上电</text>
+    <line x1="600" y1="164" x2="600" y2="192" stroke="#374151" stroke-width="2" marker-end="url(#arrow)"/>
+
+    <!-- app_main -->
+    <rect x="400" y="192" width="400" height="130" rx="10" fill="#334155"/>
+    <text x="600" y="216" text-anchor="middle" fill="#fff" font-size="15" font-weight="bold">app_main（M5 后：纯初始化）</text>
+    <text x="600" y="240" text-anchor="middle" fill="#e2e8f0" font-size="13">① nvs_flash_init（M4）</text>
+    <text x="600" y="260" text-anchor="middle" fill="#e2e8f0" font-size="13">② config_manager_init（M4 加载配置）</text>
+    <text x="600" y="280" text-anchor="middle" fill="#fbcfe8" font-size="13">③ flash_storage_init（M8 · w25q64_init + NVS溢出计数 + 指针重建）</text>
+    <text x="600" y="300" text-anchor="middle" fill="#e2e8f0" font-size="13">④ state_machine_run（M5 · 优先级6 · 永不返回）</text>
+    <line x1="600" y1="322" x2="600" y2="350" stroke="#374151" stroke-width="2" marker-end="url(#arrow)"/>
+
+    <!-- STATE_INIT -->
+    <rect x="330" y="350" width="540" height="134" rx="10" fill="#1e293b"/>
+    <text x="600" y="374" text-anchor="middle" fill="#fff" font-size="15" font-weight="bold">状态 INIT</text>
+    <text x="600" y="398" text-anchor="middle" fill="#cbd5e1" font-size="13">netif / 事件循环 · 创建 sys_event_queue + mqtt_queue（深度5）</text>
+    <text x="600" y="418" text-anchor="middle" fill="#cbd5e1" font-size="13">rs485_init（M6）· wifi_driver_init · device_manager_init（M3）</text>
+    <text x="600" y="438" text-anchor="middle" fill="#fbcfe8" font-size="13">cache_task_start(mqtt_queue)（M8 · store-and-forward 分流器）</text>
+    <text x="600" y="458" text-anchor="middle" fill="#fbcfe8" font-size="13">poll_scheduler_start + app_task_start —— 启动一次永不停止（M8）</text>
+    <line x1="600" y1="484" x2="600" y2="512" stroke="#374151" stroke-width="2" marker-end="url(#arrow)"/>
+
+    <!-- WIFI_CONN -->
+    <rect x="420" y="512" width="360" height="80" rx="10" fill="#10b981"/>
+    <text x="600" y="540" text-anchor="middle" fill="#fff" font-size="15" font-weight="bold">状态 WIFI_CONN</text>
+    <text x="600" y="564" text-anchor="middle" fill="#ecfdf5" font-size="13">wifi_driver_start · 等事件（超时 5s）</text>
+    <!-- WIFI 自重试回环 -->
+    <path d="M 780 532 C 900 512, 900 582, 790 570" fill="none" stroke="#d97706" stroke-width="2" marker-end="url(#arrowLoop)"/>
+    <text x="905" y="537" font-size="12" fill="#d97706">超时5s无事件</text>
+    <text x="905" y="554" font-size="12" fill="#d97706">stop→1s→start</text>
+    <!-- WIFI -> MQTT -->
+    <line x1="600" y1="592" x2="600" y2="628" stroke="#374151" stroke-width="2" marker-end="url(#arrow)"/>
+    <text x="612" y="616" font-size="13" fill="#059669" font-weight="bold">收到 WIFI_CONNECTED</text>
+
+    <!-- MQTT_CONN -->
+    <rect x="420" y="628" width="360" height="80" rx="10" fill="#3b82f6"/>
+    <text x="600" y="656" text-anchor="middle" fill="#fff" font-size="15" font-weight="bold">状态 MQTT_CONN</text>
+    <text x="600" y="680" text-anchor="middle" fill="#eff6ff" font-size="13">mqtt_app_start · 等事件（超时 3s）</text>
+    <!-- MQTT 自重试回环 -->
+    <path d="M 780 648 C 900 628, 900 698, 790 686" fill="none" stroke="#d97706" stroke-width="2" marker-end="url(#arrowLoop)"/>
+    <text x="905" y="653" font-size="12" fill="#d97706">超时3s无事件</text>
+    <text x="905" y="670" font-size="12" fill="#d97706">stop→1s→start</text>
+    <!-- MQTT 收到 WIFI_DISCONNECTED 回退 WIFI_CONN（左侧弧线） -->
+    <path d="M 420 668 C 300 652, 300 562, 414 554" fill="none" stroke="#dc2626" stroke-width="2" stroke-dasharray="6 4" marker-end="url(#arrowDash)"/>
+    <text x="150" y="600" font-size="12" fill="#dc2626">收到 WIFI_DISCONNECTED</text>
+    <text x="150" y="617" font-size="12" fill="#dc2626">mqtt_app_stop → 回退</text>
+    <!-- MQTT -> RUNNING -->
+    <line x1="600" y1="708" x2="600" y2="746" stroke="#374151" stroke-width="2" marker-end="url(#arrow)"/>
+    <text x="612" y="726" font-size="12" fill="#2563eb" font-weight="bold">收到 MQTT_CONNECTED</text>
+    <text x="612" y="741" font-size="12" fill="#db2777">cache_task_set_online(true) → 直发+补传</text>
+
+    <!-- RUNNING -->
+    <rect x="420" y="746" width="360" height="70" rx="10" fill="#334155" stroke="#0ea5e9" stroke-width="3"/>
+    <text x="600" y="774" text-anchor="middle" fill="#fff" font-size="16" font-weight="bold">状态 RUNNING</text>
+    <text x="600" y="796" text-anchor="middle" fill="#bae6fd" font-size="13">阻塞等事件 portMAX_DELAY · 业务全速运行</text>
+    <!-- RUNNING MQTT 断连回退（右侧绕回 MQTT_CONN） -->
+    <path d="M 780 781 C 1000 781, 1000 668, 786 668" fill="none" stroke="#dc2626" stroke-width="2" stroke-dasharray="6 4" marker-end="url(#arrowDash)"/>
+    <text x="1006" y="708" font-size="12" fill="#dc2626">MQTT_DISCONNECTED</text>
+    <text x="1006" y="724" font-size="12" fill="#db2777">set_online(false)·采集继续</text>
+    <text x="1006" y="740" font-size="12" fill="#dc2626">stop+清队列→MQTT_CONN</text>
+    <!-- RUNNING WIFI 断连回退（左侧绕回 WIFI_CONN） -->
+    <path d="M 420 781 C 220 781, 220 552, 414 552" fill="none" stroke="#dc2626" stroke-width="2" stroke-dasharray="6 4" marker-end="url(#arrowDash)"/>
+    <text x="86" y="668" font-size="12" fill="#dc2626">WIFI_DISCONNECTED</text>
+    <text x="86" y="684" font-size="12" fill="#db2777">set_online(false)·采集继续</text>
+    <text x="86" y="700" font-size="12" fill="#dc2626">stop+清队列→WIFI_CONN</text>
+
+    <!-- RUNNING 展开到 Part2 -->
+    <line x1="600" y1="816" x2="600" y2="866" stroke="#0ea5e9" stroke-width="3" marker-end="url(#arrow)"/>
+    <text x="612" y="846" font-size="13" fill="#0284c7" font-weight="bold">RUNNING 期展开：M7 采集闭环 + M8 续传</text>
+
+    <!-- ============ PART 2 标题 ============ -->
+    <text x="20" y="896" font-size="16" font-weight="bold" fill="#111827">② RUNNING 内：M7 数据采集闭环（不变） + M8 store-and-forward 断网续传</text>
+
+    <!-- ===== 采集链路（上半环） ===== -->
+    <!-- poll_scheduler -->
+    <rect x="60" y="936" width="200" height="86" rx="10" fill="#8b5cf6"/>
+    <text x="160" y="964" text-anchor="middle" fill="#fff" font-size="14" font-weight="bold">poll_scheduler（M7）</text>
+    <text x="160" y="986" text-anchor="middle" fill="#ede9fe" font-size="12">独立任务 · 优先级4</text>
+    <text x="160" y="1004" text-anchor="middle" fill="#ede9fe" font-size="12">按 poll_interval 周期触发</text>
+
+    <!-- modbus_master -->
+    <rect x="320" y="936" width="220" height="86" rx="10" fill="#3b82f6"/>
+    <text x="430" y="962" text-anchor="middle" fill="#fff" font-size="14" font-weight="bold">modbus_master（M7）</text>
+    <text x="430" y="984" text-anchor="middle" fill="#dbeafe" font-size="12">查映射表 → 组 0x03 帧</text>
+    <text x="430" y="1002" text-anchor="middle" fill="#dbeafe" font-size="12">CRC16（modbus_crc）</text>
+
+    <!-- rs485 -->
+    <rect x="600" y="936" width="190" height="86" rx="10" fill="#10b981"/>
+    <text x="695" y="962" text-anchor="middle" fill="#fff" font-size="14" font-weight="bold">rs485（M6）</text>
+    <text x="695" y="984" text-anchor="middle" fill="#ecfdf5" font-size="12">flush→send→receive</text>
+    <text x="695" y="1002" text-anchor="middle" fill="#ecfdf5" font-size="12">GPIO 方向控制</text>
+
+    <!-- 从站设备 -->
+    <rect x="850" y="936" width="220" height="86" rx="10" fill="#64748b"/>
+    <text x="960" y="962" text-anchor="middle" fill="#fff" font-size="14" font-weight="bold">Modbus 从站设备</text>
+    <text x="960" y="984" text-anchor="middle" fill="#e2e8f0" font-size="12">PC Modbus Slave 模拟</text>
+    <text x="960" y="1002" text-anchor="middle" fill="#e2e8f0" font-size="12">/ 真实温湿度变送器</text>
+
+    <!-- 采集链路箭头 -->
+    <line x1="260" y1="979" x2="316" y2="979" stroke="#374151" stroke-width="2" marker-end="url(#arrow)"/>
+    <text x="288" y="968" text-anchor="middle" font-size="11" fill="#6b7280">read_device</text>
+    <line x1="540" y1="979" x2="596" y2="979" stroke="#374151" stroke-width="2" marker-end="url(#arrow)"/>
+    <line x1="790" y1="966" x2="846" y2="966" stroke="#374151" stroke-width="2" marker-end="url(#arrow)"/>
+    <text x="818" y="956" text-anchor="middle" font-size="11" fill="#6b7280">请求帧</text>
+    <line x1="846" y1="994" x2="790" y2="994" stroke="#374151" stroke-width="2" marker-end="url(#arrow)"/>
+    <text x="818" y="1012" text-anchor="middle" font-size="11" fill="#6b7280">响应帧</text>
+
+    <!-- 响应回流到 device_manager -->
+    <path d="M 695 1022 C 695 1080, 620 1095, 544 1095" fill="none" stroke="#374151" stroke-width="2" marker-end="url(#arrow)"/>
+    <text x="700" y="1066" font-size="12" fill="#374151">CRC校验通过 → 解析寄存器 → 除以缩放因子</text>
+
+    <!-- device_manager -->
+    <rect x="320" y="1052" width="220" height="86" rx="10" fill="#f97316"/>
+    <text x="430" y="1078" text-anchor="middle" fill="#fff" font-size="14" font-weight="bold">device_manager（M3）</text>
+    <text x="430" y="1100" text-anchor="middle" fill="#ffedd5" font-size="12">update(dev_id, data)+时间戳 ts</text>
+    <text x="430" y="1118" text-anchor="middle" fill="#ffedd5" font-size="12">Mutex 保护设备表</text>
+    <!-- check_offline 分支 -->
+    <rect x="60" y="1052" width="200" height="86" rx="10" fill="#f59e0b"/>
+    <text x="160" y="1078" text-anchor="middle" fill="#fff" font-size="14" font-weight="bold">check_offline（M7）</text>
+    <text x="160" y="1100" text-anchor="middle" fill="#fef3c7" font-size="12">一轮结束后检查</text>
+    <text x="160" y="1118" text-anchor="middle" fill="#fef3c7" font-size="12">3 轮未更新 → 标记离线</text>
+    <line x1="320" y1="1095" x2="264" y2="1095" stroke="#374151" stroke-width="2" marker-end="url(#arrow)"/>
+
+    <!-- 轮询回环：check_offline -> poll_scheduler -->
+    <path d="M 100 1052 C 30 1040, 28 1000, 56 990" fill="none" stroke="#8b5cf6" stroke-width="2" stroke-dasharray="5 4" marker-end="url(#arrow)"/>
+    <text x="8" y="1012" font-size="11" fill="#7c3aed">延时后</text>
+    <text x="8" y="1028" font-size="11" fill="#7c3aed">下一轮</text>
+
+    <!-- ===== 上报链路（M8 重构） ===== -->
+    <!-- cache_task 分流规则说明框（左侧空区） -->
+    <rect x="40" y="1198" width="256" height="180" rx="10" fill="#fdf2f8" stroke="#f9a8d4"/>
+    <text x="168" y="1222" text-anchor="middle" font-size="13" font-weight="bold" fill="#9d174d">cache_task 分流规则（M8）</text>
+    <text x="54" y="1248" font-size="12" fill="#831843">1. 在线 &amp;&amp; 发布成功 → 直发云端</text>
+    <text x="54" y="1272" font-size="12" fill="#831843">2. 离线 / 发布失败 → 写入 Flash</text>
+    <text x="54" y="1296" font-size="12" fill="#831843">3. 在线上升沿 → 一次性上报溢出数</text>
+    <text x="54" y="1320" font-size="12" fill="#831843">4. pending&gt;0 且间隔≥1s → 限速补传</text>
+    <text x="54" y="1344" font-size="12" fill="#831843">5. 补传失败不推进读指针 → 重试</text>
+    <text x="54" y="1366" font-size="11" fill="#be185d">语义：at-least-once（宁可重发不丢）</text>
+
+    <!-- app_task -->
+    <rect x="320" y="1198" width="220" height="86" rx="10" fill="#14b8a6"/>
+    <text x="430" y="1224" text-anchor="middle" fill="#fff" font-size="14" font-weight="bold">app_task（M2/M3）</text>
+    <text x="430" y="1246" text-anchor="middle" fill="#ccfbf1" font-size="12">定时 get_all（只读 online）</text>
+    <text x="430" y="1264" text-anchor="middle" fill="#ccfbf1" font-size="12">cJSON 封装物模型 JSON</text>
+    <!-- device_manager -> app_task -->
+    <line x1="430" y1="1138" x2="430" y2="1194" stroke="#374151" stroke-width="2" marker-end="url(#arrow)"/>
+    <text x="442" y="1170" font-size="12" fill="#6b7280">读取设备表</text>
+
+    <!-- mqtt_queue -->
+    <rect x="600" y="1198" width="190" height="86" rx="10" fill="#0ea5e9"/>
+    <text x="695" y="1224" text-anchor="middle" fill="#fff" font-size="14" font-weight="bold">mqtt_queue</text>
+    <text x="695" y="1246" text-anchor="middle" fill="#e0f2fe" font-size="12">Queue 深度5 · app_msg_t</text>
+    <text x="695" y="1264" text-anchor="middle" fill="#e0f2fe" font-size="12">topic + payload（≤512B）</text>
+    <line x1="540" y1="1241" x2="596" y2="1241" stroke="#374151" stroke-width="2" marker-end="url(#arrow)"/>
+    <text x="568" y="1230" text-anchor="middle" font-size="11" fill="#6b7280">xQueueSend</text>
+
+    <!-- cache_task -->
+    <rect x="850" y="1198" width="220" height="86" rx="10" fill="#14b8a6" stroke="#db2777" stroke-width="3"/>
+    <text x="960" y="1222" text-anchor="middle" fill="#fff" font-size="14" font-weight="bold">cache_task（M8 · 分流器）</text>
+    <text x="960" y="1242" text-anchor="middle" fill="#ccfbf1" font-size="12">优先级5 · 消费 mqtt_queue（200ms）</text>
+    <text x="960" y="1260" text-anchor="middle" fill="#ccfbf1" font-size="12">set_online(true/false) 由状态机驱动</text>
+    <line x1="790" y1="1241" x2="846" y2="1241" stroke="#374151" stroke-width="2" marker-end="url(#arrow)"/>
+    <text x="818" y="1230" text-anchor="middle" font-size="11" fill="#6b7280">xQueueReceive</text>
+
+    <!-- cache_task -> flash_storage（落盘，粉色调） -->
+    <path d="M 880 1284 C 820 1360, 640 1420, 544 1452" fill="none" stroke="#db2777" stroke-width="2" marker-end="url(#arrowBack)"/>
+    <text x="742" y="1382" font-size="12" fill="#be185d">离线/失败 → write 落盘</text>
+
+    <!-- flash_storage -> cache_task（补传读取，回线） -->
+    <path d="M 500 1420 C 560 1340, 720 1296, 846 1268" fill="none" stroke="#db2777" stroke-width="2" stroke-dasharray="6 4" marker-end="url(#arrowBack)"/>
+    <text x="600" y="1316" font-size="12" fill="#be185d">read（不推进读指针）</text>
+
+    <!-- cache_task -> mqtt_app_publish（直发/补传发布） -->
+    <line x1="990" y1="1284" x2="990" y2="1416" stroke="#374151" stroke-width="2" marker-end="url(#arrow)"/>
+    <text x="1002" y="1350" font-size="12" fill="#374151">在线直发 /</text>
+    <text x="1002" y="1366" font-size="12" fill="#374151">补传发布</text>
+
+    <!-- ===== 存储 + 发布层 ===== -->
+    <!-- w25q64 驱动 -->
+    <rect x="60" y="1420" width="220" height="100" rx="10" fill="#10b981"/>
+    <text x="170" y="1448" text-anchor="middle" fill="#fff" font-size="14" font-weight="bold">w25q64（M8 · drivers）</text>
+    <text x="170" y="1472" text-anchor="middle" fill="#ecfdf5" font-size="12">SPI2_HOST · CS=9/SCLK=47/MOSI=48/MISO=14</text>
+    <text x="170" y="1492" text-anchor="middle" fill="#ecfdf5" font-size="12">页编程256B · 扇区擦除4KB · busy等待</text>
+
+    <!-- flash_storage -->
+    <rect x="320" y="1420" width="220" height="100" rx="10" fill="#db2777"/>
+    <text x="430" y="1444" text-anchor="middle" fill="#fff" font-size="14" font-weight="bold">flash_storage（M8 · storage）</text>
+    <text x="430" y="1464" text-anchor="middle" fill="#fce7f3" font-size="12">环形缓冲 0x000000~0x800000（8MB）</text>
+    <text x="430" y="1482" text-anchor="middle" fill="#fce7f3" font-size="12">256B/条 · MAGIC_VALID/SENT/BLANK</text>
+    <text x="430" y="1500" text-anchor="middle" fill="#fce7f3" font-size="12">满溢覆盖最旧扇区 · 溢出计数存 NVS</text>
+    <!-- flash_storage -> w25q64 -->
+    <line x1="316" y1="1470" x2="284" y2="1470" stroke="#374151" stroke-width="2" marker-end="url(#arrow)"/>
+    <text x="300" y="1456" text-anchor="middle" font-size="11" fill="#6b7280">SPI读写</text>
+
+    <!-- mqtt_app_publish -->
+    <rect x="850" y="1420" width="220" height="100" rx="10" fill="#3b82f6"/>
+    <text x="960" y="1446" text-anchor="middle" fill="#fff" font-size="14" font-weight="bold">mqtt_app_publish（M8）</text>
+    <text x="960" y="1470" text-anchor="middle" fill="#dbeafe" font-size="12">mqtt_app.c 同步发布 · QoS1</text>
+    <text x="960" y="1490" text-anchor="middle" fill="#dbeafe" font-size="12">返回 -1 → ERR_MQTT_CONN 上抛</text>
+
+    <!-- mark_sent 回注 -->
+    <text x="620" y="1545" font-size="12" fill="#be185d">发布成功 → mark_sent（magic 改 SENT + 推进读指针，逻辑删不擦除）</text>
+
+    <!-- 云端 -->
+    <rect x="560" y="1590" width="280" height="70" rx="10" fill="#64748b"/>
+    <text x="700" y="1618" text-anchor="middle" fill="#fff" font-size="15" font-weight="bold">OneNET / EMQX 云平台</text>
+    <text x="700" y="1640" text-anchor="middle" fill="#e2e8f0" font-size="12">$sys/.../thing/property/post（数据 + overflow_count）</text>
+    <path d="M 960 1520 C 960 1570, 900 1598, 844 1610" fill="none" stroke="#374151" stroke-width="2" marker-end="url(#arrow)"/>
+    <text x="932" y="1568" font-size="12" fill="#6b7280">实时/补传上报</text>
+  </svg>
+</div>
+</body>
+</html>
