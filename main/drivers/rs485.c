@@ -31,6 +31,11 @@ void rs485_init(void)
                         0,                      // TX 缓冲区
                         0, NULL, 0);    
 
+    //总线静默超过该阈值，UART硬件自动判定一帧结束
+    uart_set_rx_timeout(RS485_UART_PORT, 4);
+    //让uart_read_bytes一遇到上面的静默判定就立即返回已收字节，
+    uart_set_always_rx_timeout(RS485_UART_PORT, true);
+
     //  DE引脚配置
     gpio_config_t io_conf = {
         .pin_bit_mask = (1ULL << RS485_EN_PIN),  // 选中 GPIO7
@@ -63,6 +68,7 @@ void rs485_send(const uint8_t *data , uint16_t len)
     }
     //切回接收模式
     gpio_set_level(RS485_EN_PIN , 0);
+
 }
 
 int rs485_receive(uint8_t *buf, uint16_t buf_size,uint32_t timeout_ms)

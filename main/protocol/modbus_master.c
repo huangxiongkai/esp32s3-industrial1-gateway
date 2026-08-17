@@ -43,46 +43,57 @@ static void modbus_send_request(uint8_t addr, uint16_t reg, uint16_t count)
 
 
 /**
- * @brief 接收从站响应并做 CRC 整帧校验
- *
- * 校验方式：对整帧（含末尾 2 字节 CRC）算 modbus_crc16，
- * 结果为 0 表示数据完整（利用 CRC 数学性质）。
- *
- * @param buf 接收缓冲区（调用者分配）
- * @param len [out] 实际接收到的字节数
- * @return error_t ERR_OK=校验通过, ERR_TIMEOUT=无响应, ERR_CRC=校验失败
+ * @brief 按硬件TOUT分块接收从站响应并做校验
+ * @param buf           接收缓冲区
+ * @param expected_addr 期望的从站地址，首字节不符判为噪声块
+ * @param len           [out] 实际接收到的字节数
+ * @return error_t ERR_OK=校验通过, ERR_TIMEOUT=无响应, ERR_CRC=CRC失败
 */
-static error_t modbus_recv_response(uint8_t *buf, int *len)
+static error_t modbus_recv_response(uint8_t *buf, uint8_t expected_addr, int *len)
 {
-    int n = rs485_receive(buf, MODBUS_RESP_BUF, MODBUS_TIMEOUT_MS);
-    //解决首帧数据异常问题
-    int offset = 0;
-    while (offset < n && buf[offset] == 0x00)   
+    int n = 0;
+
+    //按块读取
+    for (int attempt = 0; attempt < 2; attempt++)
     {
-        offset ++;
-    }
-    if (offset > 0)
-    {
-        ESP_LOGD(TAG, "Skipped %d glitch byte(s)", offset);
-            memmove(buf, buf + offset, n - offset);   //把有效帧移到缓冲区头部
+        n = rs485_receive(buf, MODBUS_RESP_BUF, MODBUS_TIMEOUT_MS);
+        //处理超时
+        if (n <= 0)
+            return ERR_TIMEOUT;       
+
+        //处理首地址匹配
+        if (buf[0] == expected_addr)
+            break;      
+
+        //处理切换噪声
+        int offset = 0;
+        while (offset < n && buf[offset] != expected_addr) 
+        offset++;
+        if (offset > 0) {
+            memmove(buf, buf + offset, n - offset);
             n -= offset;
+        }
+        if (offset < n) break;
     }
-    
 
-        if (n == 0) 
-        {
-            return ERR_TIMEOUT;
-        }
-        if (modbus_crc16(buf, n) != 0)
-        {
-            ESP_LOGW(TAG, "CRC error, len=%d", n);
-            ESP_LOG_BUFFER_HEX(TAG, buf, n);   //打印收到的所有字节
-            return ERR_CRC;
-        }
-        *len = n;
-        return ERR_OK;
-        
+    //--------校验1：从站地址（补读后仍不匹配则拒收）--------
+    if (buf[0] != expected_addr)
+    {
+        ESP_LOGW(TAG, "Addr mismatch after retry: got %d, expect %d",
+                 buf[0], expected_addr);
+        return ERR_CRC;
+    }
 
+    //--------校验2：整帧CRC（对含末尾2字节CRC的整帧算，结果为0即通过）--------
+    if (modbus_crc16(buf, n) != 0)
+    {
+        ESP_LOGW(TAG, "CRC error, len=%d", n);
+        ESP_LOG_BUFFER_HEX(TAG, buf, n);
+        return ERR_CRC;
+    }
+
+    *len = n;
+    return ERR_OK;
 }
 
 /**
@@ -140,8 +151,8 @@ error_t modbus_read_device(uint8_t dev_id, const modbus_reg_map_t *map
         //1.组帧发送
         modbus_send_request(map[i].slave_addr , map[i].reg_start , 1);
         
-        //2.接收 + 校验
-        error_t err = modbus_recv_response(resp , &resp_len);
+        //2.接收 + 校验（3.5T静默判帧，顺带校验从站地址）
+        error_t err = modbus_recv_response(resp , map[i].slave_addr, &resp_len);
         if (err != ERR_OK)  
         {
             return err;
