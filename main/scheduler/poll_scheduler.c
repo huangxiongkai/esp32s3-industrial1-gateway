@@ -44,7 +44,7 @@ static const modbus_reg_map_t s_map_dev3[] =
 };
 
 
-//设备表：
+//映射设备表：
 typedef struct 
 {
     uint8_t dev_id;               //id
@@ -64,6 +64,12 @@ static const poll_device_entry_t s_device_table[] =
 #define DEVICE_COUNT  (sizeof(s_device_table) / sizeof(s_device_table[0]))
 //每个设备的连续失败计数
 static uint8_t s_fail_count[DEVICE_COUNT] = {0};
+
+//每个设备最后一次成功采集的数据副本
+static device_data_t s_last_valid[DEVICE_COUNT] = {0};
+
+// 标记每个设备是否曾经成功采集过
+static bool s_has_data[DEVICE_COUNT] = {false};
 
 /**
  * @brief 轮询任务主体
@@ -103,6 +109,9 @@ static void poll_task(void *arg)
                 //3.更新设备管理器
                 data.ts = (uint32_t)(esp_timer_get_time() / 1000);//更新时间戳
                 snprintf(data.name, sizeof(data.name),"%s",s_device_table[i].name);
+                //保存本次有效数据
+                memcpy(&s_last_valid[i], &data, sizeof(device_data_t));
+                s_has_data[i] = true;  //表示至少成功一次
                 device_manager_update(data.id , &data);
 
                     if (s_fail_count[i] > 0) 
@@ -123,17 +132,28 @@ static void poll_task(void *arg)
 
                 if(s_fail_count[i] >= OFFLINE_THRESHOLD)
                 {
-                    //达到阈值，设备下线
-                    device_data_t offline_data = {0};
-                    offline_data.id     = s_device_table[i].dev_id;
-                    offline_data.online = false;
-                    snprintf(offline_data.name,sizeof(offline_data.name),
-                                          "%s",s_device_table[i].name);
+                    if (s_has_data[i])  //若成功采集则保存数据
+                    {
+                        device_data_t tmp;
+                        memcpy(&tmp, &s_last_valid[i], sizeof(device_data_t));
+                        tmp.online = false;  //仅标记为离线
 
-                    device_manager_update(offline_data.id,&offline_data);
+                        // 更新设备管理器
+                        device_manager_update(tmp.id, &tmp);
+                    }
+                    else  //若从未采集到
+                    {
+                        device_data_t tmp = {0};  //全部清零
+                        tmp.id     = s_device_table[i].dev_id;
+                        tmp.online = false;
+                        snprintf(tmp.name, sizeof(tmp.name),
+                                 "%s", s_device_table[i].name);
+
+                        device_manager_update(tmp.id, &tmp);
+                    }
                     if (s_fail_count[i] == OFFLINE_THRESHOLD)
                     {
-                        ESP_LOGE(TAG, "Device %d [%s]OFFLINE",offline_data.id,s_device_table[i].name);
+                        ESP_LOGE(TAG, "Device %d [%s] OFFLINE",s_device_table[i].dev_id,s_device_table[i].name);
                     }
                 }
             }

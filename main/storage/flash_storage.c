@@ -23,6 +23,9 @@ static uint32_t s_overflow_count = 0;
 //NVS 句柄
 static nvs_handle_t s_nvs = 0;
 
+// overflow_persist 前向声明（定义在文件下方，但被上方函数调用）
+static void overflow_persist(void);
+
 //-----------------------------------------------------------//
 
 /**
