@@ -36,7 +36,7 @@ app_task（cJSON 合并封装，0.5 条/秒）──> mqtt_queue ──> cache_t
 |:---|:---|
 | ESP32-S3 开发板 | 主控 |
 | TTL 转 RS485 模块 | DE 方向控制接 GPIO7，详见 [docs/hardware.md](docs/hardware.md) |
-| W25Q64 模块 | SPI Flash，CS=9 / SCLK=47 / MOSI=48 / MISO=14（SPI2_HOST） |
+| W25Q64 模块 | SPI Flash，CS=9 / SCLK=47 / MOSI=48 / MISO=14（SPI3_HOST） |
 | Modbus 从站 | 真实变送器或 PC 端 Modbus Slave 软件模拟 |
 
 ## 快速开始

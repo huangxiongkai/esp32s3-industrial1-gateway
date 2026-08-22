@@ -12,7 +12,7 @@
 #define W25Q64_PIN_SCLK     47
 #define W25Q64_PIN_MOSI     48
 #define W25Q64_PIN_MISO     14
-#define W25Q64_SPI_HOST     SPI2_HOST
+#define W25Q64_SPI_HOST     SPI3_HOST
 
 //====================命令码（W25Q64数据手册）====================
 #define W25Q64_CMD_WRITE_ENABLE     0x06
